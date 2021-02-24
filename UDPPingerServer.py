@@ -26,4 +26,3 @@ while True:
 
     # Otherwise, the server responds
     serverSocket.sendto(message, address)
-    
