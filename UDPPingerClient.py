@@ -19,7 +19,7 @@ clientSocket = socket(AF_INET, SOCK_DGRAM)
 clientSocket.settimeout(2)
 
 # Ping ten times
-for i in range(1,21):
+for i in range(1, 21):
 
     # Get the current time.
     currentTime = time.time()
