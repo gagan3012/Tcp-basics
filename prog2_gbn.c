@@ -84,29 +84,76 @@ void send_window(void)
 /* called from layer 5, passed the data to be sent to other side */
 A_output(message) struct msg message;
 {
-
-
+    if (A.buffer - A.base >= BUFSIZE)
+    {
+        printf("  A_output: buffer full. drop the message: %s\n", message.data);
+        return;
+    }
+    printf("  A_output: bufferred packet (seq=%d): %s\n", A.buffer, message.data);
+    struct pkt *packet = &A.packet_buffer[A.buffer % BUFSIZE];
+    packet->seqnum = A.buffer;
+    memmove(packet->payload, message.data, 20);
+    packet->checksum = get_checksum(packet);
+    ++A.buffer;
+    send_window();
 }
 
 B_output(message) /* need be completed only for extra credit */
     struct msg message;
 {
+    printf("  B_output: uni-directional Message: %s\n", message.data);
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
 A_input(packet) struct pkt packet;
 {
+    if (packet.checksum != get_checksum(&packet))
+    {
+        printf("  A_input: packet corrupted. drop.\n");
+        return;
+    }
+    if (packet.acknum < A.base)
+    {
+        printf("  A_input: got NAK (ack=%d) so we'll drop it drop.\n", packet.acknum);
+        return;
+    }
+    printf("  A_input: got ACK (ack=%d)\n", packet.acknum);
+    A.base = packet.acknum + 1;
+    if (A.base == A.nextdata)
+    {
+        stoptimer(0);
+        printf("  A_input: stop timer\n");
+        send_window();
+    }
+    else
+    {
+        starttimer(0, A.rtt);
+        printf("  A_input: timer + %f\n", A.rtt);
+    }
 }
 
 /* called when A's timer goes off */
 A_timerinterrupt()
 {
+    for (int i = A.base; i < A.nextdata; ++i)
+    {
+        struct pkt *packet = &A.packet_buffer[i % BUFSIZE];
+        printf("  A_timerinterrupt: resend packet (seq=%d): %s\n", packet->seqnum, packet->payload);
+        tolayer3(0, *packet);
+    }
+    starttimer(0, A.rtt);
+    printf("  A_timerinterrupt: timer + %f\n", A.rtt);
 }
 
 /* the following routine will be called once (only) before any other */
 /* entity A routines are called. You can use it to do any initialization */
 A_init()
 {
+    A.base = 1;
+    A.nextdata = 1;
+    A.window = 8;
+    A.rtt = 15;
+    A.buffer = 1;
 }
 
 /* Note that with simplex transfer from a-to-B, there is no B_output() */
@@ -114,17 +161,45 @@ A_init()
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 B_input(packet) struct pkt packet;
 {
+    if (packet.checksum != get_checksum(&packet))
+    {
+        printf("  B_input: packet corrupted. send NAK (ack=%d)\n", B.packet_sent.acknum);
+        tolayer3(1, B.packet_sent);
+        return;
+    }
+    if (packet.seqnum != B.data)
+    {
+        printf("  B_input: not the expected seq. send NAK (ack=%d)\n", B.packet_sent.acknum);
+        tolayer3(1, B.packet_sent);
+        return;
+    }
+
+    printf("  B_input: recv packet (seq=%d): %s\n", packet.seqnum, packet.payload);
+    tolayer5(1, packet.payload);
+
+    printf("  B_input: send ACK (ack=%d)\n", B.data);
+    B.packet_sent.acknum = B.data;
+    B.packet_sent.checksum = get_checksum(&B.packet_sent);
+    tolayer3(1, B.packet_sent);
+
+    ++B.data;
 }
 
 /* called when B's timer goes off */
 B_timerinterrupt()
 {
+    printf("  B_timerinterrupt: B doesn't have a timer\n");
 }
 
 /* the following rouytine will be called once (only) before any other */
 /* entity B routines are called. You can use it to do any initialization */
 B_init()
 {
+    B.data = 1;
+    B.packet_sent.seqnum = -1;
+    B.packet_sent.acknum = 0;
+    memset(B.packet_sent.payload, 0, 20);
+    B.packet_sent.checksum = get_checksum(&B.packet_sent);
 }
 
 /*****************************************************************
