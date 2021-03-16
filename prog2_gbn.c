@@ -49,14 +49,14 @@ struct sender
     float rtt;
     int buffer;
     struct pkt packet_buffer[BUFSIZE];
-}A;
+} A;
 
 struct receiver
 {
     /* data */
     int data;
     struct pkt packet_sent;
-}B;
+} B;
 
 int get_checksum(struct pkt *packet)
 {
@@ -87,7 +87,7 @@ A_output(message) struct msg message;
     if (A.buffer - A.base >= BUFSIZE)
     {
         printf("  A_output: buffer full. drop the message: %s\n", message.data);
-        return;
+        return 0;
     }
     printf("  A_output: bufferred packet (seq=%d): %s\n", A.buffer, message.data);
     struct pkt *packet = &A.packet_buffer[A.buffer % BUFSIZE];
@@ -110,12 +110,12 @@ A_input(packet) struct pkt packet;
     if (packet.checksum != get_checksum(&packet))
     {
         printf("  A_input: packet corrupted. drop.\n");
-        return;
+        return 0;
     }
     if (packet.acknum < A.base)
     {
         printf("  A_input: got NAK (ack=%d) so we'll drop it drop.\n", packet.acknum);
-        return;
+        return 0;
     }
     printf("  A_input: got ACK (ack=%d)\n", packet.acknum);
     A.base = packet.acknum + 1;
@@ -165,13 +165,13 @@ B_input(packet) struct pkt packet;
     {
         printf("  B_input: packet corrupted. send NAK (ack=%d)\n", B.packet_sent.acknum);
         tolayer3(1, B.packet_sent);
-        return;
+        return 0;
     }
     if (packet.seqnum != B.data)
     {
         printf("  B_input: not the expected seq. send NAK (ack=%d)\n", B.packet_sent.acknum);
         tolayer3(1, B.packet_sent);
-        return;
+        return 0;
     }
 
     printf("  B_input: recv packet (seq=%d): %s\n", packet.seqnum, packet.payload);
@@ -365,7 +365,7 @@ init() /* initialize the simulator */
         printf("It is likely that random number generation on your machine\n");
         printf("is different from what this emulator expects.  Please take\n");
         printf("a look at the routine jimsrand() in the emulator code. Sorry. \n");
-        exit();
+        exit(-1);
     }
 
     ntolayer3 = 0;
@@ -500,7 +500,7 @@ stoptimer(AorB) int AorB; /* A or B is trying to stop timer */
                 q->prev->next = q->next;
             }
             free(q);
-            return;
+            return 0;
         }
     printf("Warning: unable to cancel your timer. It wasn't running.\n");
 }
@@ -521,7 +521,7 @@ float increment;
         if ((q->evtype == TIMER_INTERRUPT && q->eventity == AorB))
         {
             printf("Warning: attempt to start a timer that is already started\n");
-            return;
+            return 0;
         }
 
     /* create future event for when timer goes off */
@@ -550,7 +550,7 @@ struct pkt packet;
         nlost++;
         if (TRACE > 0)
             printf("          TOLAYER3: packet being lost\n");
-        return;
+        return 0;
     }
 
     /* make a copy of the packet student just gave me since he/she may decide */
