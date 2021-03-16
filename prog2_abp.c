@@ -38,7 +38,8 @@ struct pkt
 
 /********* STUDENTS WRITE THE NEXT SEVEN ROUTINES *********/
 
-enum StateSender{
+enum StateSender
+{
     Wait_layers,
     Wait_ACK
 };
@@ -71,9 +72,10 @@ int get_checksum(struct pkt *packet)
 /* called from layer 5, passed the data to be sent to other side */
 A_output(message) struct msg message;
 {
-    if(A.state != Wait_layers){
+    if (A.state != Wait_layers)
+    {
         printf(" A_output: not yet acked we will drop the message: %s\n", message.data);
-        return;
+        return 0;
     }
     printf("  A_output: send packet: %s\n", message.data);
     struct pkt packet;
@@ -89,7 +91,7 @@ A_output(message) struct msg message;
 B_output(message) /* need be completed only for extra credit */
     struct msg message;
 {
-    printf("  B_output: uni-directional Message: %s\n",message.data);
+    printf("  B_output: uni-directional Message: %s\n", message.data);
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
@@ -98,18 +100,18 @@ A_input(packet) struct pkt packet;
     if (A.state != Wait_ACK)
     {
         printf("  A_input: A->B only Is uni-directional\n");
-        return;
+        return 0;
     }
     if (packet.checksum != get_checksum(&packet))
     {
         printf("  A_input: packet corrupted\n");
-        return;
+        return 0;
     }
 
     if (packet.acknum != A.data)
     {
         printf("  A_input: not the expected ACK\n");
-        return;
+        return 0;
     }
     printf("  A_input: acked.\n");
     stoptimer(0);
@@ -123,7 +125,7 @@ A_timerinterrupt()
     if (A.state != Wait_ACK)
     {
         printf("  A_timerinterrupt: not waiting ACK\n");
-        return;
+        return 0;
     }
     printf("  A_timerinterrupt: resend prev packet: %s.\n", A.prev_packet.payload);
     tolayer3(0, A.prev_packet);
@@ -140,6 +142,13 @@ A_init()
 }
 
 /* Note that with simplex transfer from a-to-B, there is no B_output() */
+void send_ack(int AorB, int ack)
+{
+    struct pkt packet;
+    packet.acknum = ack;
+    packet.checksum = get_checksum(&packet);
+    tolayer3(AorB, packet);
+}
 
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 B_input(packet) struct pkt packet;
@@ -148,13 +157,13 @@ B_input(packet) struct pkt packet;
     {
         printf("  B_input: packet corrupted. sent NAK.\n");
         send_ack(1, 1 - B.data);
-        return;
+        return 0;
     }
     if (packet.seqnum != B.data)
     {
         printf("  B_input: not the expected seq. sent NAK.\n");
         send_ack(1, 1 - B.data);
-        return;
+        return 0;
     }
     printf("  B_input: recv message: %s\n", packet.payload);
     printf("  B_input: send ACK.\n");
@@ -339,7 +348,7 @@ init() /* initialize the simulator */
         printf("It is likely that random number generation on your machine\n");
         printf("is different from what this emulator expects.  Please take\n");
         printf("a look at the routine jimsrand() in the emulator code. Sorry. \n");
-        exit();
+        exit(-1);
     }
 
     ntolayer3 = 0;
@@ -474,7 +483,7 @@ stoptimer(AorB) int AorB; /* A or B is trying to stop timer */
                 q->prev->next = q->next;
             }
             free(q);
-            return;
+            return 0;
         }
     printf("Warning: unable to cancel your timer. It wasn't running.\n");
 }
@@ -495,7 +504,7 @@ float increment;
         if ((q->evtype == TIMER_INTERRUPT && q->eventity == AorB))
         {
             printf("Warning: attempt to start a timer that is already started\n");
-            return;
+            return 0;
         }
 
     /* create future event for when timer goes off */
@@ -524,7 +533,7 @@ struct pkt packet;
         nlost++;
         if (TRACE > 0)
             printf("          TOLAYER3: packet being lost\n");
-        return;
+        return 0;
     }
 
     /* make a copy of the packet student just gave me since he/she may decide */
