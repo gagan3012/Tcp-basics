@@ -38,9 +38,54 @@ struct pkt
 
 /********* STUDENTS WRITE THE NEXT SEVEN ROUTINES *********/
 
+#define BUFSIZE 64
+
+struct sender
+{
+    /* data */
+    int base;
+    int nextdata;
+    int window;
+    float rtt;
+    int buffer;
+    struct pkt packet_buffer[BUFSIZE];
+}A;
+
+struct receiver
+{
+    /* data */
+    int data;
+    struct pkt packet_sent;
+}B;
+
+int get_checksum(struct pkt *packet)
+{
+    int checksum = 0;
+    checksum += packet->seqnum;
+    checksum += packet->acknum;
+    for (int i = 0; i < 20; ++i)
+        checksum += packet->payload[i];
+    return checksum;
+}
+
+void send_window(void)
+{
+    while (A.nextdata < A.buffer && A.nextdata < A.base + A.window)
+    {
+        struct pkt *packet = &A.packet_buffer[A.nextdata % BUFSIZE];
+        printf("  send_window: send packet (seq=%d): %s\n", packet->seqnum, packet->payload);
+        tolayer3(0, *packet);
+        if (A.base == A.nextdata)
+            starttimer(0, A.rtt);
+        ++A.nextdata;
+    }
+}
+
 /* called from layer 5, passed the data to be sent to other side */
 A_output(message) struct msg message;
 {
+
+
 }
 
 B_output(message) /* need be completed only for extra credit */
